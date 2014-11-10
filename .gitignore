@@ -1,0 +1,17 @@
+*.#1
+*.#2
+*.#3
+*.adb
+*.asm
+*.lst
+*.lst
+*.lst
+*.rel
+*.rst
+*.sym
+*.out
+tmp.out
+tmp.out
+Lab4.sym
+Lab4.rel
+Lab4.lst
