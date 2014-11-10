@@ -1,0 +1,89 @@
+Mark Blanco
+Brad Jewett
+Litec Section 02
+Side B Seat 27
+Lance Gerday
+Aaron Clippinger
+Side A Seat 5
+Lab 6.0 Pseudocode
+(Implement previous control code for gondola)
+
+#include necessary header files
+#define constants
+Function Prototypes
+initialize necessary counters and other global variables
+Set initial values for heading and gains
+calculation
+
+main()
+    run default setup for c8051 and init functions
+    wait to set neutral for motor
+    while(1)
+        if  steering slide switch is active:
+            Update current steering pulse width value to center
+            update CCM registers to reflect new pwm value
+        else if 40 milliseconds have passed:
+            reset the counter
+            call and store readCompass() as current heading
+            display heading on lcd display
+            Update Steering_Fan with current heading    
+            update CCM registers to reflect new pwm value
+        if 80 milliseconds have passed
+	    reset 80ms flag
+	    take a reading from read_ranger()
+	    if the range is greater than 100cm, floor the reading to 100cm
+	    range heading adjustment equals range gain *(50cm - reading)
+    Start a new ranger ping
+        if ranging slide switch is active:
+            set heading to default
+        else:
+            set desired_heading to recalculated heading from ranger measurements
+        Print battery voltage every second using A/D Conversion
+	while both slide switches are off
+	    stop steering motor
+	    Check_Menu() every 100ms
+        if keys pressed on keypad:
+            begin reading key presses and update settings as needed
+        read battery level and display to LCD using ADC
+//----------------------------------------------------------------------------
+Steering_Fan(current_heading):
+	based on current heading and desired heading, 
+return P&D based pw value for steering motor
+//----------------------------------------------------------------------------
+readCompass()        // return compass heading as unsigned integer
+read heading from compass (two bytes of data)
+return unsigned int containing the two bytes combined
+//----------------------------------------------------------------------------
+Load_Menu()
+    Displays menu on LCD display:
+    1. Proportional Gain (Heading)
+    2. Derivative Gain (Heading)
+    3. Desired Heading
+    Print current values of range, current heading, and battery voltage
+//----------------------------------------------------------------------------
+Check_Menu()
+    if '1' is pressed
+	request a 5 digit value for proportional compass gain
+	multiply value by 0.001
+    if '2' is pressed
+	request a 5 digit value for derivative compass gain
+	multiply value by 0.001
+    if '3' is pressed
+	Display Heading selection menu
+	wait for all buttons to be released
+	1. 0 degrees
+	2. 90 degrees
+	3. 180 degrees
+	4. 270 degrees
+	5. Enter Heading
+	if '5' is pressed
+	    Request a 4 digit value for heading
+//----------------------------------------------------------------------------
+PCA_ISR()
+    Set initial PCA0 value for a 20ms period
+    increment counters to take heading, get range, etc.
+    Clear overflow flag
+//----------------------------------------------------------------------------
+read_ranger()
+    Read two bytes from the ranger
+    return the range as an integer
