@@ -1,10 +1,10 @@
 Mark Blanco
 Brad Jewett
-Litec Section 02
 Side B Seat 27
 Lance Gerday
 Aaron Clippinger
 Side A Seat 5
+Litec Section 02
 Lab 6.0 Pseudocode
 (Implement previous control code for gondola)
 
