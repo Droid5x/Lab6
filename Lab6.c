@@ -374,20 +374,29 @@ void PCA_ISR(void) __interrupt 9 {
 //
 
 void Steering(unsigned int current_heading) {
-    error = desired_heading - current_heading; // Calculate signed error
+    error = desired_heading - current_heading + heading_adj; // Calculate signed error
     if (error > 1800) { // If the error is greater than 1800
     	error = 3600 % error; // or less than -1800, then the 
         error *= -1; // conjugate angle needs to be generated
     } else if (error < -1800) { // with opposite sign from the original
         error = 3600 % abs(error); // error
     }
+    
     // Update PW based on error and distance to obstacle
-    fan_PW = (long)proportional_gain * (long)error + (long)fan_PW_NEUT;
-    if (fan_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
-        fan_PW = fan_PW_MAX; // Set PW to a maximum value
-    } else if (fan_PW < fan_PW_MIN) { // Check if less than pulsewidth min
-        fan_PW = fan_PW_MIN; // Set fan_PW to a minimum value
+    fan_C_PW = (long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error) + (long)fan_PW_NEUT;
+    fan_L_PW = (long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error) + (long)fan_PW_NEUT;
+    fan_R_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error))*-1 + (long)fan_PW_NEUT;
+    
+    if (fan_C_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
+        fan_C_PW = fan_PW_MAX; // Set PW to a maximum value
+        fan_L_PW = fan_PW_MAX; // Set PW to a maximum value
+        fan_R_PW = fan_PW_MIN; // Set PW to a maximum value
+    } else if (fan_C_PW < fan_PW_MIN) { // Check if less than pulsewidth min
+        fan_C_PW = fan_PW_MIN; // Set fan_PW to a minimum value
+        fan_L_PW = fan_PW_MIX; // Set PW to a maximum value
+        fan_R_PW = fan_PW_MAX; // Set PW to a maximum value
     }
+    prev_error = error;
 }
 
 void Angle_Adjust(void){
