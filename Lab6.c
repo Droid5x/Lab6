@@ -1,7 +1,8 @@
 /* Aaron Clippinger, Lance Gerday, Bradley Jewett, Mark Blanco
    Section 2 Side A Seat 5
    October 27, 2014
-   Lab 4 */
+   Lab 6
+*/
 
 
 #include <stdio.h>
@@ -40,10 +41,10 @@ void Load_Menu(void);
 //-----------------------------------------------------------------------------
 unsigned char interrupts;
 unsigned char take_heading;
-unsigned int servo_PW_CENTER = 2905; // Center PW value
-unsigned int servo_PW_MIN = 2385; // Minimum left PW value
-unsigned int servo_PW_MAX = 3315; // Maximum right PW value
-long int servo_PW = 2905; // Start PW at center
+unsigned int servo_PW_CENTER = TBD//2905; // Center PW value
+unsigned int servo_PW_MIN = TBD//2385; // Minimum left PW value
+unsigned int servo_PW_MAX = TBD//3315; // Maximum right PW value
+long int servo_PW = servo_PW_CENTER; // Start PW at center
 
 unsigned int desired_heading = 900; // Set initial heading to 90 degrees
 
@@ -287,18 +288,18 @@ unsigned char read_ranger(void) {
 
 void Port_Init() {
 
-    XBR0 = 0x25; // configure crossbar with UART, SPI, SMBus, and CEX channels 
-            // set output pin P0.7 and P1.1 for push-pull mode (CEX2 and CEX0)
-            P1MDOUT |= 0x02;
-			P0MDOUT |= 0x80;
+    XBR0 = 0x25; // configure crossbar with UART, SPI, SMBus, and CEX channels
+				 // set output pins P0.4, P0.5, P0.6, P0.7 for push-pull
+				 // mode (CEX 0, 1, 2, 3)
+	P0MDOUT |= 0xF0;
 
-            // Port 1 ADC
-            P1MDIN &= ~0x80; //set P1.7 to Analog input
-            P1MDOUT &= ~0x80; //set P1.7 to open drain mode
-            P1 |= 0x80; //set P1.7 to high impedance
+    // Port 1 ADC
+    P1MDIN &= ~0x20; //set P1.5 to Analog input
+    P1MDOUT &= ~0x20; //set P1.5 to open drain mode
+    P1 |= 0x20; //set P1.5 to high impedance
 
-            P3MDOUT &= ~0xC0; // Set P3.6 and 3.7 to inputs
-            P3 |= 0xC0; //set P3.6 and 3.7 to high impedance
+    P3MDOUT &= ~0xC0; // Set P3.6 and 3.7 to inputs
+    P3 |= 0xC0; //set P3.6 and 3.7 to high impedance
 
 }
 
@@ -312,9 +313,9 @@ void Port_Init() {
 void ADC_Init(void) {
 
     REF0CN = 0x03; // Use internal reference voltage (2.4V)
-            ADC1CN = 0x80; // Enable A/D conversion
-            ADC1CF &= 0xFC; // Reset last two bits to 0
-            ADC1CF |= 0x01; // Gain set to 1.0
+    ADC1CN = 0x80; // Enable A/D conversion
+    ADC1CF &= 0xFC; // Reset last two bits to 0
+    ADC1CF |= 0x01; // Gain set to 1.0
 }
 
 //-----------------------------------------------------------------------------
@@ -325,14 +326,12 @@ void ADC_Init(void) {
 //
 
 unsigned char read_AD_input(void) {
-    AMX1SL = 7; // Set pin 7 as the analog input
-            ADC1CN &= ~0x20; // Clear 'conversion complete' flag
-            ADC1CN |= 0x10; // Initiate A/D conversion
-
+    AMX1SL = 5; // Set pin 5 as the analog input
+    ADC1CN &= ~0x20; // Clear 'conversion complete' flag
+    ADC1CN |= 0x10; // Initiate A/D conversion
     while ((ADC1CN & 0x20) == 0x00); // Wait for conversion to complete
-
-        return ADC1; // Return digital conversion value
-    }
+    return ADC1; // Return digital conversion value
+}
 
 //-----------------------------------------------------------------------------
 // PCA_Init
@@ -345,13 +344,13 @@ void PCA_Init(void) {
 
     PCA0MD = 0x81; // enable CF interrupt, use SYSCLK/12
 
-            PCA0CN = 0x40; // enable PCA0 counter
-            // select 16bit PWM, enable positive edge capture, 
-            // enable pulse width modulation(ranger)
-            PCA0CPM2 = 0xC2;
-            // select 16bit PWM, enable positive edge capture,
-            // enable pulse width modulation(compass)
-            PCA0CPM0 = 0xC2;
+    PCA0CN = 0x40; // enable PCA0 counter
+    // select 16bit PWM, enable positive edge capture, 
+    // enable pulse width modulation(ranger)
+    PCA0CPM2 = 0xC2;
+    // select 16bit PWM, enable positive edge capture,
+    // enable pulse width modulation(compass)
+    PCA0CPM0 = 0xC2;
 }
 
 //-----------------------------------------------------------------------------
@@ -362,9 +361,8 @@ void PCA_Init(void) {
 //
 
 void Interrupt_Init(void) {
-
-    EIE1 |= 0x08; //Enable PCA0 Interrupt (bit 3) 
-            EA = 1; //Enable global interrupts
+	EIE1 |= 0x08; //Enable PCA0 Interrupt (bit 3) 
+	EA = 1; //Enable global interrupts
 
 }
 
@@ -376,9 +374,8 @@ void Interrupt_Init(void) {
 //
 
 void SMB_Init(void) {
-
-    SMB0CR = 0x93; //Configure SCL frequency to 100kHz
-            ENSMB = 1; // Enable SMBus
+	SMB0CR = 0x93; //Configure SCL frequency to 100kHz
+	ENSMB = 1; // Enable SMBus
 }
 
 
@@ -393,17 +390,16 @@ void SMB_Init(void) {
 void PCA_ISR(void) __interrupt 9 {
     if (CF) { // If an interrupt has occured
         interrupts++;
-                c++; // Counter for initial wait to initialize motor
-        if (interrupts % 2 == 0) {
-            take_heading = 1; // It is appropriate to take a reading
-        }
+        c++; // Counter for initial wait to initialize motor
+    	if (interrupts % 2 == 0) {
+        	take_heading = 1; // It is appropriate to take a reading
+    	}
         if (interrupts >= 4) {
-
-            getRange = 1; // 80ms flag
-                    interrupts = 0; // Reset counter
+			getRange = 1; // 80ms flag
+            interrupts = 0; // Reset counter
         }
         CF = 0; // Clear Interrupt Flag
-                PCA0 = 28672; // Jump timer ahead for given period
+        PCA0 = 28672; // Jump timer ahead for given period
     }
     PCA0CN &= 0xC0; // Handle other PCA interrupts
 }
@@ -416,8 +412,8 @@ void PCA_ISR(void) __interrupt 9 {
 void Steering_Servo(unsigned int current_heading) {
     compass_error = desired_heading - current_heading; // Calculate signed error
     if (compass_error > 1800) { // If the error is greater than 1800
-        compass_error = 3600 % compass_error; // or less than -1800, then the 
-                compass_error *= -1; // conjugate angle needs to be generated
+    	compass_error = 3600 % compass_error; // or less than -1800, then the 
+        compass_error *= -1; // conjugate angle needs to be generated
     } else if (compass_error < -1800) { // with opposite sign from the original
         compass_error = 3600 % abs(compass_error); // error
     }
