@@ -10,13 +10,9 @@
 #include <c8051_SDCC.h>
 #include <i2c.h>
 
-#define MAX_RANGE 60
-#define MOTOR_PW_MIN 2030
-#define MOTOR_PW_MAX 3500
-#define MOTOR_PW_NEUT 2760
+#define MAX_RANGE 100
 #define R_ADDR 0xE0
 #define C_ADDR 0xC0
-#define SPEED  8
 
 
 //-----------------------------------------------------------------------------
@@ -267,14 +263,11 @@ void Drive_Motor(unsigned int input) {
 
 unsigned char read_ranger(void) {
     unsigned int range = 0;
-            unsigned char slave_reg = 2; //start at register 2
-            unsigned char num_bytes = 2; //read 2 bytes
-
-            // read two bytes, starting at reg 2
-            i2c_read_data(R_ADDR, slave_reg, Data, num_bytes);
-
-            range = (((unsigned int) Data[0] << 8) | Data[1]);
-
+    unsigned char slave_reg = 2; //start at register 2
+    unsigned char num_bytes = 2; //read 2 bytes
+	// read two bytes, starting at reg 2
+    i2c_read_data(R_ADDR, slave_reg, Data, num_bytes);
+	range = (((unsigned int) Data[0] << 8) | Data[1]);
     return range;
 }
 
