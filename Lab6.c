@@ -13,6 +13,9 @@
 #define MAX_RANGE 100
 #define R_ADDR 0xE0
 #define C_ADDR 0xC0
+#define fan_PW_NEUT 2750 // Neutral PW value
+#define fan_PW_MIN 2000 // Minimum left PW value
+#define fan_PW_MAX 3500 // Maximum right PW value
 
 
 //-----------------------------------------------------------------------------
@@ -30,6 +33,7 @@ unsigned char read_ranger(void);
 void Check_Menu(void);
 void Load_Menu(void);
 void Angle_Adjust(void);
+void Fan_Update(void);
 
 //-----------------------------------------------------------------------------
 // Global Variables
@@ -39,15 +43,12 @@ unsigned int c = 0; // Counter for printing data at regular intervals
 unsigned char take_heading = 0; // Boolean flag to read the compass
 unsigned char getRange = 1; // Boolean flag to tell if safe to read ranger
 
-unsigned int fan_PW_NEUT = 2750; // Center PW value
-unsigned int fan_PW_MIN = 2000;  // Minimum left PW value
-unsigned int fan_PW_MAX = 3500;  // Maximum right PW value
 long int fan_C_PW = fan_PW_NEUT; // Start PW at neutral
 long int fan_L_PW = fan_PW_NEUT; // Start PW at neutral
 long int fan_R_PW = fan_PW_NEUT; // Start PW at neutral
 unsigned int angle_PW = 0; // Motor Pulsewidth to control motor speed
 
-unsigned int desired_heading = 900; // Set initial heading to 90 degrees
+__xdata unsigned int desired_heading = 900; // Set initial heading to 90 degrees
 
 signed int prev_error = 0; // Previous compass error
 signed int error; // Global variable for compass error
@@ -57,8 +58,8 @@ float voltage; // Global voltage variable for checking battery voltage
 unsigned char Data[2]; // Array for sending and receiving from ranger
 unsigned int heading_adj; // Range-based heading adjustment
 
-float derivative_gain = 40; // Derivative gain
-float proportional_gain = 0.417; // Compass gain setting
+__xdata float derivative_gain = 40; // Derivative gain
+__xdata float proportional_gain = 0.417; // Compass gain setting
 
 __sbit __at 0xB6 SS_range; // Assign P3.6 to SS (Slide Switch)
 __sbit __at 0xB7 SS_steer; // Slide switch input pin at P3.7
@@ -85,7 +86,9 @@ void main(void) {
     //Main Functionality
     while (1) {
         if (SS_steer) { // If the slide switch is active, set PW to center
-            fan_PW = fan_PW_NEUT;
+            fan_L_PW = fan_PW_NEUT;
+            fan_R_PW = fan_PW_NEUT;
+            fan_C_PW = fan_PW_NEUT;
             Fan_Update();
         } else if (take_heading) { // Otherwise take a new heading
             compass_val = Read_Compass();
@@ -110,7 +113,7 @@ void main(void) {
                     , proportional_gain, derivative_gain);
             printf("BEGIN DATA POINT\n\r");
             printf("Error: %d  Heading: %d  Steering PW: %d  Adjustment: %d\n\r"
-                    , error, compass_val, fan_PW, heading_adj);
+                    , error, compass_val, fan_C_PW, heading_adj);
             printf("END DATA POINT\n\n\r");
 
             // Print the battery voltage (from AD conversion);
@@ -157,8 +160,7 @@ void Check_Menu() {
     unsigned int keypad_input;
 
     if ((menu_input - '0') == 1) { //If proportional gain is selected
-        printf("Please enter a 5 digit gain constant
-                (of the form : xx.xxx) \n\r");
+        printf("Please enter a 5 digit gain constant (of the form : xx.xxx) \n\r");
                 lcd_clear();
                 lcd_print("Enter a 5 digit gain\nconstant (xx.xxx)");
         while (read_keypad() != -1);
@@ -167,8 +169,7 @@ void Check_Menu() {
                 printf_fast_f("New proportional gain is %f\n\r", proportional_gain);
                 Load_Menu();
         } else if ((menu_input - '0') == 2) { //If derivative gain is selected
-        printf("Please enter a 5 digit gain constant
-                (of the form : xx.xxx) \n\r");
+        printf("Please enter a 5 digit gain constant (of the form : xx.xxx) \n\r");
                 lcd_clear();
                 lcd_print("Enter a 5 digit gain\nconstant (xx.xxx)");
         while (read_keypad() != -1);
@@ -179,12 +180,10 @@ void Check_Menu() {
         } else if ((menu_input - '0') == 3) { //If desired heading is selected
         printf("Please choose an option: \n\r");
                 //Print menu on terminal output
-                printf("1: 0 degrees\n\r2: 90 degrees\n\r3: 180 degrees
-                \n\r4 : 270 degrees\n\r5 : Enter a value\n\r");
+                printf("1: 0 degrees\n\r2: 90 degrees\n\r3: 180 degrees\n\r4 : 270 degrees\n\r5 : Enter a value\n\r");
                 lcd_clear();
                 //Print menu on lcd
-                lcd_print("\n1.0 deg   2.90 deg\n3.180 deg 4.270 deg
-                        \n5.Enter a value");
+                lcd_print("\n1.0 deg   2.90 deg\n3.180 deg 4.270 deg\n5.Enter a value");
         while (read_keypad() != -1);
         menu_input = read_keypad();
         while (menu_input == -1) menu_input = read_keypad();
@@ -197,8 +196,7 @@ void Check_Menu() {
         } else if ((menu_input - '0') == 4) { //For 270 degrees
             desired_heading = 2700;
         } else if ((menu_input - '0') == 5) { //For enter own value
-            printf("Please enter a 5 digit compass heading 
-                    (of the form : 0xxxx) \n\r");
+            printf("Please enter a 5 digit compass heading (of the form : 0xxxx) \n\r");
                     lcd_clear();
                     lcd_print("\nEnter a 5 digit\nheading (0xxxx)\n\r");
 
@@ -374,7 +372,7 @@ void PCA_ISR(void) __interrupt 9 {
 //
 
 void Steering(unsigned int current_heading) {
-    error = desired_heading - current_heading + heading_adj; // Calculate signed error
+    error = (desired_heading + heading_adj)%3600 - current_heading; // Calculate signed error
     if (error > 1800) { // If the error is greater than 1800
     	error = 3600 % error; // or less than -1800, then the 
         error *= -1; // conjugate angle needs to be generated
@@ -393,7 +391,7 @@ void Steering(unsigned int current_heading) {
         fan_R_PW = fan_PW_MIN; // Set PW to a maximum value
     } else if (fan_C_PW < fan_PW_MIN) { // Check if less than pulsewidth min
         fan_C_PW = fan_PW_MIN; // Set fan_PW to a minimum value
-        fan_L_PW = fan_PW_MIX; // Set PW to a maximum value
+        fan_L_PW = fan_PW_MIN; // Set PW to a maximum value
         fan_R_PW = fan_PW_MAX; // Set PW to a maximum value
     }
     prev_error = error;
