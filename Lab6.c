@@ -46,7 +46,7 @@ unsigned char getRange = 1; // Boolean flag to tell if safe to read ranger
 long int fan_C_PW = fan_PW_NEUT; // Start PW at neutral
 long int fan_L_PW = fan_PW_NEUT; // Start PW at neutral
 long int fan_R_PW = fan_PW_NEUT; // Start PW at neutral
-unsigned int angle_PW = 0; // Motor Pulsewidth to control motor speed
+unsigned int angle_PW = 2500; // Motor Pulsewidth to control motor speed
 
 __xdata unsigned int desired_heading = 900; // Set initial heading to 90 degrees
 
@@ -58,8 +58,8 @@ float voltage; // Global voltage variable for checking battery voltage
 unsigned char Data[2]; // Array for sending and receiving from ranger
 unsigned int heading_adj; // Range-based heading adjustment
 
-__xdata float derivative_gain = 40; // Derivative gain
-__xdata float proportional_gain = 0.417; // Compass gain setting
+__xdata float derivative_gain = 45; // Derivative gain
+__xdata float proportional_gain = 5; // Compass gain setting
 
 __sbit __at 0xB6 SS_range; // Assign P3.6 to SS (Slide Switch)
 __sbit __at 0xB7 SS_steer; // Slide switch input pin at P3.7
@@ -81,11 +81,15 @@ void main(void) {
 
     //print beginning message
     printf("Embedded Control Blimp\r\n");
-
+	Angle_Adjust();
     Load_Menu();
     //Main Functionality
+	// Start a new ping
+    Data[0] = 0x51; // write 0x51 to reg 0 of the ranger:
+    // write one byte of data to reg 0 at R_ADDR
+    i2c_write_data(R_ADDR, 0, Data, 1);
     while (1) {
-        if (SS_steer) { // If the slide switch is active, set PW to center
+	    if (SS_steer) { // If the slide switch is active, set PW to center
             fan_L_PW = fan_PW_NEUT;
             fan_R_PW = fan_PW_NEUT;
             fan_C_PW = fan_PW_NEUT;
@@ -100,13 +104,13 @@ void main(void) {
             range_val = read_ranger(); // Read the distance from the ranger
             // Floor the value of the ranger within the specified limits:
             if (range_val > MAX_RANGE) range_val = MAX_RANGE;
-            heading_adj = (int) (3.6 * (MAX_RANGE/2 - range_val));
+            heading_adj = (int)(3.6 * (MAX_RANGE/2 - range_val));
             // Start a new ping
             Data[0] = 0x51; // write 0x51 to reg 0 of the ranger:
             // write one byte of data to reg 0 at R_ADDR
             i2c_write_data(R_ADDR, 0, Data, 1);
         }
-        // Hold the motor in neutral if the slide switch is active
+		// Hold the motor in neutral if the slide switch is active
         if (c >= 25) {
             //Print Serial Output for data collection
             printf_fast_f("Compass Gain: %f Ranger Gain: %f\n\r"
@@ -210,17 +214,14 @@ void Check_Menu() {
 }
 
 void Load_Menu(void) {
-
-    unsigned int PW_Percent;
-            lcd_clear();
-            lcd_print("1. Proportional Gain\n");
-            lcd_print("2. Derivative Gain\n");
-            lcd_print("3. Desired Heading\n");
-
-            PW_Percent = (abs(fan_C_PW - fan_PW_NEUT)*200.0)
-            / ((fan_PW_MAX - fan_PW_MIN));
-            lcd_print("R:%3dH:%4dS:%2dB:%2d\n", range_val, compass_val,
-                PW_Percent, (int) voltage);
+	printf("in the loading func\n\r");
+    //unsigned int PW_Percent;
+    lcd_clear();
+    lcd_print("1. Proportional Gain\n");
+    lcd_print("2. Derivative Gain\n");
+    lcd_print("3. Desired Heading\n");
+	//PW_Percent = (abs(fan_C_PW - fan_PW_NEUT)*200.0) / ((fan_PW_MAX - fan_PW_MIN));
+    //lcd_print("R:%3dH:%4dS:%2dB:%2d\n", range_val, compass_val, PW_Percent, (int) voltage);
 }
 
 
@@ -372,7 +373,8 @@ void PCA_ISR(void) __interrupt 9 {
 //
 
 void Steering(unsigned int current_heading) {
-    error = (desired_heading + heading_adj)%3600 - current_heading; // Calculate signed error
+	//heading_adj%3600
+    error = (desired_heading) - current_heading; // Calculate signed error
     if (error > 1800) { // If the error is greater than 1800
     	error = 3600 % error; // or less than -1800, then the 
         error *= -1; // conjugate angle needs to be generated
@@ -387,19 +389,31 @@ void Steering(unsigned int current_heading) {
     
     if (fan_C_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
         fan_C_PW = fan_PW_MAX; // Set PW to a maximum value
-        fan_L_PW = fan_PW_MAX; // Set PW to a maximum value
-        fan_R_PW = fan_PW_MIN; // Set PW to a maximum value
     } else if (fan_C_PW < fan_PW_MIN) { // Check if less than pulsewidth min
         fan_C_PW = fan_PW_MIN; // Set fan_PW to a minimum value
-        fan_L_PW = fan_PW_MIN; // Set PW to a maximum value
-        fan_R_PW = fan_PW_MAX; // Set PW to a maximum value
     }
+
+
+	if (fan_L_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
+		fan_L_PW = fan_PW_MAX; // Set PW to a maximum value
+	} else if (fan_L_PW < fan_PW_MIN) { // Check if less than pulsewidth min
+		fan_L_PW = fan_PW_MIN; // Set PW to a maximum value
+	}
+
+
+	if (fan_R_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
+		fan_R_PW = fan_PW_MAX; // Set PW to a maximum value
+	} else if (fan_R_PW < fan_PW_MIN) { // Check if less than pulsewidth min
+		fan_R_PW = fan_PW_MIN; // Set PW to a maximum value
+	}
     prev_error = error;
 }
 
 void Angle_Adjust(void){
     while(1){
         char input;
+        PCA0CP1 = 0xFFFF - angle_PW;
+        printf("PW: %u \n\r", angle_PW);
         //wait for a key to be pressed
         input = getchar();
         if(input == 'd')  // single character input to increase the pulsewidth
@@ -413,15 +427,13 @@ void Angle_Adjust(void){
         else if (input == 's')  // single character input to select value as final
         {
             printf("Value selected!\n\r");
-            break;
+            return;
         }
-        printf("PW: %u \n\r", angle_PW);
-        PCA0CP1 = 0xFFFF - angle_PW;
     }
 }
 
 void Fan_Update(void){
     PCA0CP0 = 0xFFFF - fan_C_PW;
-    PCA0CP2 = 0xFFFF - fan_R_PW;
-    PCA0CP3 = 0xFFFF - fan_L_PW;
+    PCA0CP2 = 0xFFFF - fan_L_PW;
+    PCA0CP3 = 0xFFFF - fan_R_PW;
 }
