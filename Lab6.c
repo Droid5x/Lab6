@@ -81,7 +81,8 @@ void main(void) {
 
     //print beginning message
     printf("Embedded Control Blimp\r\n");
-	Angle_Adjust();
+    printf("desired heading\t actual heading\t ranger reading\t heading adjustment\t rudder pw\t voltage\n\r");
+    Angle_Adjust();
     Load_Menu();
     //Main Functionality
 	// Start a new ping
@@ -117,12 +118,9 @@ void main(void) {
 		// Hold the motor in neutral if the slide switch is active
         if (c >= 25) {
             //Print Serial Output for data collection
-            printf_fast_f("Compass Gain: %f Ranger Gain: %f\n\r"
-                    , proportional_gain, derivative_gain);
-            printf("BEGIN DATA POINT\n\r");
-            printf("Error: %d  Heading: %d  Steering PW: %d  Adjustment: %d\n\r"
-                    , error, compass_val, fan_C_PW, heading_adj);
-            printf("END DATA POINT\n\n\r");
+            printf("%d\t %d\t %d\t %d\t %d\t "
+                    , desired_heading, compass_val, range_val, heading_adj, fan_C_PW);
+            printf_fast_f("%f\n\r", voltage);
 
             // Print the battery voltage (from AD conversion);
             voltage = read_AD_input();
