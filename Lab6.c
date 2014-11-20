@@ -46,7 +46,7 @@ unsigned char getRange = 1; // Boolean flag to tell if safe to read ranger
 long int fan_C_PW = fan_PW_NEUT; // Start PW at neutral
 long int fan_L_PW = fan_PW_NEUT; // Start PW at neutral
 long int fan_R_PW = fan_PW_NEUT; // Start PW at neutral
-unsigned int angle_PW = 2500; // Motor Pulsewidth to control motor speed
+unsigned int angle_PW = 3700; // Motor Pulsewidth to control motor speed
 
 __xdata unsigned int desired_heading = 900; // Set initial heading to 90 degrees
 
@@ -58,7 +58,7 @@ float voltage; // Global voltage variable for checking battery voltage
 unsigned char Data[2]; // Array for sending and receiving from ranger
 unsigned int heading_adj; // Range-based heading adjustment
 
-__xdata float derivative_gain = 45; // Derivative gain
+__xdata float derivative_gain = 35; // Derivative gain
 __xdata float proportional_gain = 2; // Compass gain setting
 
 __sbit __at 0xB6 SS_range; // Assign P3.6 to SS (Slide Switch)
@@ -81,8 +81,8 @@ void main(void) {
 
     //print beginning message
     printf("Embedded Control Blimp\r\n");
-    printf("desired heading\t actual heading\t ranger reading\t heading adjustment\t rudder pw\t voltage\n\r");
     Angle_Adjust();
+	printf("desired heading\t actual heading\t ranger reading\t heading adjustment\t rudder pw\t error\t voltage\n\r");
     Load_Menu();
     //Main Functionality
 	// Start a new ping
@@ -118,14 +118,12 @@ void main(void) {
 		// Hold the motor in neutral if the slide switch is active
         if (c >= 25) {
             //Print Serial Output for data collection
-            printf("%d\t %d\t %d\t %d\t %d\t "
-                    , desired_heading, compass_val, range_val, heading_adj, fan_C_PW);
-            printf_fast_f("%f\n\r", voltage);
+            printf("%14d, %14d, %14d, %14d, %14ld, %14d, "
+                    , desired_heading, compass_val, range_val, heading_adj, fan_C_PW, error\);
 
             // Print the battery voltage (from AD conversion);
-            voltage = read_AD_input();
-            voltage *= 0.04;
-            printf_fast_f("Battery voltage is: %.2f\n\r", voltage);
+            voltage = (float)read_AD_input()*0.04;
+			printf_fast_f("%14.2f\n\r", voltage);
             Load_Menu();
             c = 0;
         }
@@ -174,12 +172,12 @@ void Check_Menu() {
                 printf_fast_f("New proportional gain is %f\n\r", proportional_gain);
                 Load_Menu();
         } else if ((menu_input - '0') == 2) { //If derivative gain is selected
-        printf("Please enter a 5 digit gain constant (of the form : xx.xxx) \n\r");
+        printf("Please enter a 5 digit gain constant (of the form : xxx.xx) \n\r");
                 lcd_clear();
-                lcd_print("Enter a 5 digit gain\nconstant (xx.xxx)");
+                lcd_print("Enter a 5 digit gain\nconstant (xxx.xx)");
         while (read_keypad() != -1);
                 keypad_input = kpd_input(1);
-                derivative_gain = keypad_input * 0.001;
+                derivative_gain = keypad_input * 0.01;
                 printf_fast_f("New derivative gain is %f\n\r", derivative_gain);
                 Load_Menu();
         } else if ((menu_input - '0') == 3) { //If desired heading is selected
@@ -219,14 +217,11 @@ void Check_Menu() {
 }
 
 void Load_Menu(void) {
-	printf("in the loading func\n\r");
-    //unsigned int PW_Percent;
     lcd_clear();
     lcd_print("1. Prop Gain\n");
     lcd_print("2. Derivative Gain\n");
     lcd_print("3. Desired Heading\n");
-	PW_Percent = (abs(fan_C_PW - fan_PW_NEUT)*200.0) / ((fan_PW_MAX - fan_PW_MIN));
-    lcd_print("R:%3dH:%4dS:%2dB:%3d\n", range_val, compass_val, PW_Percent, (int) voltage*10);
+    lcd_print("Battery: %3d dv\n",(int)(voltage*10));
 }
 
 
@@ -264,9 +259,9 @@ void Port_Init() {
 	P0MDOUT |= 0xF0;
 
     // Port 1 ADC
-    P1MDIN &= ~0x20; //set P1.5 to Analog input
-    P1MDOUT &= ~0x20; //set P1.5 to open drain mode
-    P1 |= 0x20; //set P1.5 to high impedance
+    P1MDIN &= ~0x08; //set P1.3 to Analog input
+    P1MDOUT &= ~0x08; //set P1.3 to open drain mode
+    P1 |= 0x08; //set P1.3 to high impedance
 
     P3MDOUT &= ~0xC0; // Set P3.6 and 3.7 to inputs
     P3 |= 0xC0; //set P3.6 and 3.7 to high impedance
@@ -296,7 +291,7 @@ void ADC_Init(void) {
 //
 
 unsigned char read_AD_input(void) {
-    AMX1SL = 5; // Set pin 5 as the analog input
+    AMX1SL = 3; // Set pin 3 as the analog input
     ADC1CN &= ~0x20; // Clear 'conversion complete' flag
     ADC1CN |= 0x10; // Initiate A/D conversion
     while ((ADC1CN & 0x20) == 0x00); // Wait for conversion to complete
@@ -387,8 +382,8 @@ void Steering(unsigned int current_heading) {
     }
     
     // Update PW based on error and distance to obstacle
-    fan_C_PW = 0.5*((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
-    fan_L_PW = 0.5*((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
+    fan_C_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
+    fan_L_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
     fan_R_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error))*-1 + (long)fan_PW_NEUT;
     
     if (fan_C_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
@@ -422,11 +417,11 @@ void Angle_Adjust(void){
         input = getchar();
         if(input == 'd')  // single character input to increase the pulsewidth
         {
-            angle_PW += 10;
+            angle_PW += 30;
         }
         else if(input == 'a')  // single character input to decrease the pulsewidth
         {
-            angle_PW -= 10;       // Subtract 10 from PW
+            angle_PW -= 30;       // Subtract 10 from PW
         }
         else if (input == 's')  // single character input to select value as final
         {
