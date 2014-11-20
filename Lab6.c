@@ -122,8 +122,7 @@ void main(void) {
 
             // Print the battery voltage (from AD conversion);
             voltage = read_AD_input();
-            voltage /= 256;
-            voltage *= 15.6;
+            voltage *= 0.04;
             printf_fast_f("Battery voltage is: %.2f\n\r", voltage);
             Load_Menu();
             c = 0;
