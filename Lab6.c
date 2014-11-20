@@ -225,8 +225,8 @@ void Load_Menu(void) {
     lcd_print("1. Prop Gain\n");
     lcd_print("2. Derivative Gain\n");
     lcd_print("3. Desired Heading\n");
-	//PW_Percent = (abs(fan_C_PW - fan_PW_NEUT)*200.0) / ((fan_PW_MAX - fan_PW_MIN));
-    //lcd_print("R:%3dH:%4dS:%2dB:%2d\n", range_val, compass_val, PW_Percent, (int) voltage);
+	PW_Percent = (abs(fan_C_PW - fan_PW_NEUT)*200.0) / ((fan_PW_MAX - fan_PW_MIN));
+    lcd_print("R:%3dH:%4dS:%2dB:%3d\n", range_val, compass_val, PW_Percent, (int) voltage*10);
 }
 
 
