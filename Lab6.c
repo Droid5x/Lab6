@@ -59,7 +59,7 @@ unsigned char Data[2]; // Array for sending and receiving from ranger
 unsigned int heading_adj; // Range-based heading adjustment
 
 __xdata float derivative_gain = 45; // Derivative gain
-__xdata float proportional_gain = 5; // Compass gain setting
+__xdata float proportional_gain = 2; // Compass gain setting
 
 __sbit __at 0xB6 SS_range; // Assign P3.6 to SS (Slide Switch)
 __sbit __at 0xB7 SS_steer; // Slide switch input pin at P3.7
@@ -104,7 +104,11 @@ void main(void) {
             range_val = read_ranger(); // Read the distance from the ranger
             // Floor the value of the ranger within the specified limits:
             if (range_val > MAX_RANGE) range_val = MAX_RANGE;
-            heading_adj = (int)(3.6 * (MAX_RANGE/2 - range_val));
+            if (!SS_range){
+                heading_adj = (int)(36 * (MAX_RANGE/2 - range_val));
+            } else {
+                //heading_adj = 0;
+            }
             // Start a new ping
             Data[0] = 0x51; // write 0x51 to reg 0 of the ranger:
             // write one byte of data to reg 0 at R_ADDR
@@ -192,20 +196,24 @@ void Check_Menu() {
         while (menu_input == -1) menu_input = read_keypad();
         if ((menu_input - '0') == 1) { //For 0 degrees
             desired_heading = 0;
+			while(read_keypad() != -1);
         } else if ((menu_input - '0') == 2) { //For 90 degrees
             desired_heading = 900;
+			while(read_keypad() != -1);
         } else if ((menu_input - '0') == 3) { //For 180 degrees
             desired_heading = 1800;
+			while(read_keypad() != -1);
         } else if ((menu_input - '0') == 4) { //For 270 degrees
             desired_heading = 2700;
+			while(read_keypad() != -1);
         } else if ((menu_input - '0') == 5) { //For enter own value
             printf("Please enter a 5 digit compass heading (of the form : 0xxxx) \n\r");
                     lcd_clear();
                     lcd_print("\nEnter a 5 digit\nheading (0xxxx)\n\r");
 
             while (read_keypad() == -1);
-                    keypad_input = kpd_input(1);
-                    desired_heading = keypad_input % 3600;
+            keypad_input = kpd_input(1);
+            desired_heading = keypad_input % 3600;
         }
         printf("New desired heading is %d\n\r", desired_heading);
                 Load_Menu();
@@ -216,7 +224,7 @@ void Load_Menu(void) {
 	printf("in the loading func\n\r");
     //unsigned int PW_Percent;
     lcd_clear();
-    lcd_print("1. Proportional Gain\n");
+    lcd_print("1. Prop Gain\n");
     lcd_print("2. Derivative Gain\n");
     lcd_print("3. Desired Heading\n");
 	//PW_Percent = (abs(fan_C_PW - fan_PW_NEUT)*200.0) / ((fan_PW_MAX - fan_PW_MIN));
@@ -372,8 +380,7 @@ void PCA_ISR(void) __interrupt 9 {
 //
 
 void Steering(unsigned int current_heading) {
-	//heading_adj%3600
-    error = (desired_heading) - current_heading; // Calculate signed error
+    error = (desired_heading + heading_adj)%3600 - current_heading; // Calculate signed error
     if (error > 1800) { // If the error is greater than 1800
     	error = 3600 % error; // or less than -1800, then the 
         error *= -1; // conjugate angle needs to be generated
@@ -382,8 +389,8 @@ void Steering(unsigned int current_heading) {
     }
     
     // Update PW based on error and distance to obstacle
-    fan_C_PW = (long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error) + (long)fan_PW_NEUT;
-    fan_L_PW = (long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error) + (long)fan_PW_NEUT;
+    fan_C_PW = 0.5*((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
+    fan_L_PW = 0.5*((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
     fan_R_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error))*-1 + (long)fan_PW_NEUT;
     
     if (fan_C_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
