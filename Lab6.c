@@ -382,8 +382,8 @@ void Steering(unsigned int current_heading) {
     }
     
     // Update PW based on error and distance to obstacle
-    fan_C_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
-    fan_L_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
+    fan_C_PW = 0.5*((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
+    fan_L_PW = 0.5*((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error)) + (long)fan_PW_NEUT;
     fan_R_PW = ((long)proportional_gain * (long)error +( long)derivative_gain*((long)error-(long)prev_error))*-1 + (long)fan_PW_NEUT;
     
     if (fan_C_PW > fan_PW_MAX) { // Check if pulsewidth maximum exceeded
